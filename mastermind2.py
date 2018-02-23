@@ -1,4 +1,5 @@
-import requests, json, sys, re
+import requests, json, sys, random
+from itertools import permutations
 
 
 def main():
@@ -18,24 +19,25 @@ def main():
         lvl_info = r.json()  # > {'numGladiators': 4, 'numGuesses': 8, 'numRounds': 1, 'numWeapons': 6}
         print_level_info(level, lvl_info)
 
+        # produce a set of all possible guesses
+        guess_set = set(unique_permutations(range(lvl_info['numWeapons']), lvl_info['numGladiators']))
+
         # defeat the gladiators!!!
         while(True):
-            # input integers separated by commas; weapons begin from 0
-            weapons = input('Choose your weapons!:')
-            #guess = list(map(int, weapons.split(',')))
-            guess = list(map(int, re.findall(r'\d+', weapons)))
+            # random guess from the set
+            guess = list(random_guess(guess_set))
             # accept judgement from the mastermind
             r = requests.post('https://mastermind.praetorian.com/level/1/', data=json.dumps({'guess': guess}), headers=headers)
             judgement = r.json()  # > {'response': [2, 1]}
-
-            # print(judgement)
 
             if 'response' in judgement:
                 # print judgement
                 print('correct weapons: {0} / {1}'.format(judgement['response'][0], lvl_info['numGladiators']))
                 print('correct gladiators: {0} / {1}'.format(judgement['response'][1], lvl_info['numGladiators']))
+                # remove guesses from guess set that wouldn't give the same judgement
+                guess_set = remove_codes(guess_set, guess, judgement['response'])
             elif 'error' in judgement:
-                # error; probably because 10 sec passed
+                # error; probably because 10 sec passed or no more guesses
                 print(judgement['error'])
                 break
             elif 'message' in judgement:
@@ -50,11 +52,11 @@ def main():
     # VICTORY - now get the hash
     r = requests.post('https://mastermind.praetorian.com/hash/', headers=headers)
     hash = r.json()
-    print('Victory is yours.')
+    print('Victory is yours!!!')
     print('Hash: {}'.format(hash['hash']))
     print(hash)
 
-
+"""Prepare headers for subsequent API calls"""
 def get_header():
     email = 'cjohnson@cm.utexas.edu'  # my email
     r = requests.post('https://mastermind.praetorian.com/api-auth-token/', data={'email': email})
@@ -63,8 +65,7 @@ def get_header():
     headers['Content-Type'] = 'application/json'
     return headers
 
-
-
+"""Print level information"""
 def print_level_info(level, lvl_info):
     print()
     print('LEVEL {0}'.format(level))
@@ -73,6 +74,39 @@ def print_level_info(level, lvl_info):
     print('weapons: {0[numWeapons]:d}'.format(lvl_info))
     print('gladiators: {0[numGladiators]:d}'.format(lvl_info))
     print()
+
+"""Generator for unique permutations of an iterable - 
+https://stackoverflow.com/questions/6284396/permutations-with-unique-values"""
+def unique_permutations(iterable, r=None):
+    previous = tuple()
+    for p in permutations(sorted(iterable), r):
+        if p > previous:
+            previous = p
+            yield p
+
+"""Select a random guess from the guess set"""
+def random_guess(guess_set):
+    return random.sample(guess_set, 1)[0]
+
+"""Remove codes from a set that wouldn't give the same response from the mastermind"""
+def remove_codes(code_set, guess, response):
+    # TODO maybe use del list instead of set.remove()
+    correct_weapons = response[0]
+    correct_gladiators = response[1]
+    code_set.remove(tuple(guess))
+    new_code_set = set(code_set)
+    for code in code_set:
+        # test code positions (gladiators)
+        count = 0
+        for pos in range(0, len(code)):
+            if guess[pos] == code[pos]:
+                count += 1
+        if correct_gladiators > count:
+            new_code_set.remove(code)
+        # test code weapons
+        if correct_weapons > len(set(code) & set(guess)):
+            new_code_set.remove(code)
+    return new_code_set
 
 if __name__ == "__main__":
     main()

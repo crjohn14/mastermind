@@ -11,11 +11,14 @@ def main():
 
     # play the game
     done = False
-    level = 1
+    level = 2
     while(not done):
         # request level info from the mastermind
         r = requests.get('https://mastermind.praetorian.com/level/{0}/'.format(level), headers=headers)
         lvl_info = r.json()  # > {'numGladiators': 4, 'numGuesses': 8, 'numRounds': 1, 'numWeapons': 6}
+
+        print(lvl_info) # DEBUG
+
         print_level_info(level, lvl_info)
 
         # defeat the gladiators!!!

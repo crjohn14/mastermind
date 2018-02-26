@@ -1,7 +1,7 @@
 import requests, json, sys, random
 from itertools import permutations
 
-url = 'https://mastermind.praetorian.com'
+base_url = 'https://mastermind.praetorian.com'
 
 def main():
     # check Python version
@@ -10,26 +10,17 @@ def main():
 
     # initialize headers
     headers = get_header()
-    #print(headers)  # DEBUG
 
     # play the game
-    post_reset(headers)
-
     done = False
     level = 1
     while(not done):
         # request level info from the mastermind
-        lvl_info = request_level(level, headers)
+        lvl_info = request_level(level, headers)  # > {'numGladiators': 4, 'numGuesses': 8, 'numRounds': 1, 'numWeapons': 6}
 
-        if 'numWeapons' in lvl_info:
-            print_level_info(level, lvl_info)
-        elif 'error' in lvl_info:
-            print(lvl_info)
-            continue
-        else:
-            print('Did not expect result from level request.')
-            print(lvl_info)
-            sys.exit(0)
+        print(lvl_info)
+
+        print_level_info(level, lvl_info)
 
         # produce a set of all possible guesses
         guess_set = set(unique_permutations(range(lvl_info['numWeapons']), lvl_info['numGladiators']))
@@ -40,15 +31,15 @@ def main():
         while(True):
             # random guess from the set
             guess = list(random_guess(guess_set))
-            print("Guess set size : {}".format(len(guess_set)))
             print("Guess: {}".format(guess))
             # accept judgement from the mastermind
-            judgement = post_guess(level, guess, headers)
+            r = requests.post('https://mastermind.praetorian.com/level/1/', data=json.dumps({'guess': guess}), headers=headers)
+            judgement = r.json()  # > {'response': [2, 1]}
 
             if 'response' in judgement:
                 # print judgement
                 print('correct weapons: {0} / {1}'.format(judgement['response'][0], lvl_info['numGladiators']))
-                print('correct gladiators: {0} / {1}\n'.format(judgement['response'][1], lvl_info['numGladiators']))
+                print('correct gladiators: {0} / {1}'.format(judgement['response'][1], lvl_info['numGladiators']))
                 # remove guesses from guess set that wouldn't give the same judgement
                 guess_set = remove_codes(guess_set, guess, judgement['response'])
             elif 'error' in judgement:
@@ -65,39 +56,23 @@ def main():
                 sys.exit(0)
 
     # VICTORY - now get the hash
-    hash = get_hash(headers)
+    r = requests.post('https://mastermind.praetorian.com/hash/', headers=headers)
+    hash = r.json()
     print('Victory is yours!!!')
     print('Hash: {}'.format(hash['hash']))
     print(hash)
 
 """Prepare headers for subsequent API calls"""
 def get_header():
-    email = 'cjohnson@cm.utexas.edu'  # my email
+    email = 'crjohn14@asu.edu'  # my email
     r = requests.post('https://mastermind.praetorian.com/api-auth-token/', data={'email': email})
-    r.json()
     headers = r.json()  # > {'Auth-Token': 'AUTH_TOKEN'}
     headers['Content-Type'] = 'application/json'
     return headers
 
-"""request level information from mastermind"""
 def request_level(level_number, headers):
-    r = requests.get(url + '/level/' + str(level_number) + '/', headers=headers)
+    r = requests.get(base_url + '/level/' + level_number + '/', headers=headers)
     return r.json()  # > {'numGladiators': 4, 'numGuesses': 8, 'numRounds': 1, 'numWeapons': 6}
-
-"""post guess to mastermind"""
-def post_guess(level_number, guess, headers):
-    r = requests.post(url + '/level/' + str(level_number) + '/', data=json.dumps({'guess': guess}), headers=headers)
-    return r.json()  # > {'response': [2, 1]}
-
-"""request hash for completing mastermind"""
-def get_hash(headers):
-    r = requests.post(url + '/hash/', headers=headers)
-    return r.json()
-
-"""post reset to start back at level 1"""
-def post_reset(headers):
-    r = requests.post(url + '/reset/', headers=headers)
-    return r.json()
 
 """Print level information"""
 def print_level_info(level, lvl_info):
@@ -106,7 +81,8 @@ def print_level_info(level, lvl_info):
     print('rounds: {0[numRounds]:d}'.format(lvl_info))
     print('guesses: {0[numGuesses]:d}'.format(lvl_info))
     print('weapons: {0[numWeapons]:d}'.format(lvl_info))
-    print('gladiators: {0[numGladiators]:d}\n'.format(lvl_info))
+    print('gladiators: {0[numGladiators]:d}'.format(lvl_info))
+    print()
 
 """Generator for unique permutations of an iterable - 
 https://stackoverflow.com/questions/6284396/permutations-with-unique-values"""
@@ -117,7 +93,7 @@ def unique_permutations(iterable, r=None):
             previous = p
             yield p
 
-"""Choose a random guess from the guess set"""
+"""Select a random guess from the guess set"""
 def random_guess(guess_set):
     return random.sample(guess_set, 1)[0]
 
@@ -137,9 +113,9 @@ def remove_codes(code_set, guess, response):
         if correct_gladiators > count:
             new_code_set.remove(code)
         # test code weapons
-        elif correct_weapons > len(set(code) & set(guess)):
+        if correct_weapons > len(set(code) & set(guess)):
             new_code_set.remove(code)
-    #print(new_code_set) #DEBUG
+    print(new_code_set) #DEBUG
     return new_code_set
 
 if __name__ == "__main__":

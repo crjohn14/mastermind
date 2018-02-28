@@ -40,16 +40,12 @@ def main():
     if sys.version_info < (3, 0):
         sys.exit('Python version < 3.0 does not support modern TLS versions. You will have trouble connecting to our API using Python 2.X.')
 
-    # initialize headers
     headers = get_header()
-
-    # play the game
     post_reset(headers)
 
     done = False
     level = 1
     while(not done):
-        # request level info from the mastermind
         lvl_info = get_level(level, headers)
 
         if 'numWeapons' in lvl_info:
@@ -72,7 +68,7 @@ def main():
             guess_set = set(permutations(range(lvl_info['numWeapons']), lvl_info['numGladiators']))
             level += fight_gladiators(guess_set, level, lvl_info, headers)
         else:
-            # determine the correct weapons in level 4
+            # determine the correct weapons in level 4 from weapon combinations
             weapon_set = set(combinations(range(lvl_info['numWeapons']), lvl_info['numGladiators']))
             correct_weapons = determine_weapons(weapon_set, level, headers)
             print('correct weapons: {}\n'.format(correct_weapons))
@@ -125,16 +121,14 @@ def remove_codes(code_set, guess, response):
                 new_code_set.remove(code)
     return new_code_set
 
-"""Choose a random element from the guess set, receive judgement from mastermind, then update the set if necessary
-    :return level increment"""
 def fight_gladiators(guess_set, level, lvl_info, headers):
     """Choose a random element from the guess set, post guess, receive judgement, then update the set if necessary
 
     Args:
-        guess_set:
-        level:
-        lvl_info:
-        headers: header info for
+        guess_set: set to choose a guess from
+        level: current level
+        lvl_info: response from get_level
+        headers: header for API
 
     Returns:
         int: level increment
@@ -175,8 +169,8 @@ def fight_gladiators(guess_set, level, lvl_info, headers):
             print(judgement)
             sys.exit(0)
 
-"""level 4 - determine correct weapons"""
 def determine_weapons(weapon_set, level, headers):
+    """level 4 - determine correct weapons"""
     count = 0
     print('Determining correct weapon set.')
     while (True):
@@ -200,8 +194,8 @@ def determine_weapons(weapon_set, level, headers):
             print(judgement)
             sys.exit(0)
 
-"""level 4 - remove codes"""
 def remove_codes_4(code_set, guess, response):
+    """level 4 - remove codes without considering position"""
     correct_weapons = response[0]
     new_code_set = set(code_set)
     for code in code_set:
@@ -210,10 +204,14 @@ def remove_codes_4(code_set, guess, response):
             new_code_set.remove(code)
     return new_code_set
 
-"""minimax - calculate how many possibilities in the set would be eliminated for each possible response from mastermind
-    NOT IMPLEMENTED/INCOMPLETE
-    :return - code with highest minimum score"""
 def minimax(guess_set, num_gladiators):
+    """minimax - calculate how many possibilities in the set would be eliminated for each possible response
+
+    NOT IMPLEMENTED/INCOMPLETE
+
+    Returns:
+        tuple: code with highest minimum score
+    """
     ret = ()
     ret_score = 0
     for code in guess_set:

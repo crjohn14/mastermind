@@ -1,7 +1,39 @@
-import requests, json, sys, random, time
-from itertools import permutations, combinations
-from call_api import post_reset, post_guess, get_hash, get_header, get_level
+"""Solution for Praetorians's Mastermind Challenge
+Chris Johnson
+Date: 21 Feb 2018 - current
 
+The challenge is a variation of the boardgame Mastermind in which 1 player creates a code and the other player guesses
+until the code is found or they run out of turns.  After each guess they are told how many code elements were correct
+and how many code positions were correct.  This version simulates fighting a number of gladiators, each of which are
+weak to a specific weapon.  The player is given the number of gladiators and the number of possible weapons at the start
+of each level.  The player is told how many gladiators were defeated and how many weapons were correct after each guess.
+
+https://www.praetorian.com/challenges/mastermind
+
+This solution utilizes a variation of Knuth's 5-guess algorithm .
+(https://en.wikipedia.org/wiki/Mastermind_(board_game)#Algorithms)
+
+The algorithm:
+1. Build a set, S, of all possible permutations
+2. Randomly select a guess from S
+3. Submit the guess and get a response
+4. If the guess was correct, then continue to the next level
+5. Else, Remove all codes from S that would not give the same response
+6. Repeat from step 2
+
+Minimax was found to not be necessary (may implement later) when selecting guesses.
+
+Level 4 required a different strategy due to the ~128 million permutations.  First the correct set of weapons were
+determined by guessing from a set of all possible weapon combinations, which is only 177,100.  Once the correct set of
+weapons is determined, further guesses are made from permutations of only those weapons.
+
+I was unable to get past level 5 due to the server occasionally taking as long as 20 seconds to respond to a post
+request.
+"""
+
+import sys, random, time
+from itertools import permutations, combinations
+from call_api import post_reset, post_guess, get_header, get_level
 
 def main():
     # check Python version
@@ -52,8 +84,8 @@ def main():
 
     sys.exit(0)
 
-"""Print level information"""
 def print_level_info(level, lvl_info):
+    """Print level information"""
     print()
     print('LEVEL {0}'.format(level))
     print('rounds: {0[numRounds]:d}'.format(lvl_info))
@@ -61,13 +93,21 @@ def print_level_info(level, lvl_info):
     print('weapons: {0[numWeapons]:d}'.format(lvl_info))
     print('gladiators: {0[numGladiators]:d}\n'.format(lvl_info))
 
-"""Choose a random guess from the guess set"""
 def random_guess(guess_set):
+    """Choose a random guess from the guess set"""
     return random.sample(guess_set, 1)[0]
 
-"""Remove codes from a set that wouldn't give the same response from the mastermind
-    :return - new set with codes removed"""
 def remove_codes(code_set, guess, response):
+    """Remove codes from the code_set if they wouldn't give the same response
+
+    Args:
+        code_set: set of codes to filter
+        guess: the guess that produced response
+        response: the APIs response to guess
+
+    Returns:
+        set: new set with codes removed
+    """
     correct_weapons = response[0]
     correct_gladiators = response[1]
     new_code_set = set(code_set)
@@ -85,10 +125,20 @@ def remove_codes(code_set, guess, response):
                 new_code_set.remove(code)
     return new_code_set
 
-"""choose a random element from the guess set, receive judgement from mastermind, then update the set if necessary
+"""Choose a random element from the guess set, receive judgement from mastermind, then update the set if necessary
     :return level increment"""
 def fight_gladiators(guess_set, level, lvl_info, headers):
-    # defeat the gladiators!!!
+    """Choose a random element from the guess set, post guess, receive judgement, then update the set if necessary
+
+    Args:
+        guess_set:
+        level:
+        lvl_info:
+        headers: header info for
+
+    Returns:
+        int: level increment
+    """
     while (True):
         # random guess from the set
         guess = random_guess(guess_set)

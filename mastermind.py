@@ -25,7 +25,7 @@ def main():
         elif 'error' in lvl_info:
             print(lvl_info['error'])
             continue
-        elif 'hash':
+        elif 'hash' in lvl_info:
             print('Victory is yours!!!')
             print('Hash: {}'.format(lvl_info['hash']))
             done = True
@@ -104,15 +104,15 @@ def unique_permutations(iterable, r=None):
 def random_guess(guess_set):
     return random.sample(guess_set, 1)[0]
 
-"""Remove codes from a set that wouldn't give the same response from the mastermind"""
+"""Remove codes from a set that wouldn't give the same response from the mastermind
+    :return - new set with codes removed"""
 def remove_codes(code_set, guess, response):
     correct_weapons = response[0]
     correct_gladiators = response[1]
     new_code_set = set(code_set)
-    new_code_set.remove(tuple(guess))
     for code in code_set:
         # test code weapons
-        if correct_weapons > len(set(code) & set(guess)):
+        if correct_weapons != len(set(code) & set(guess)):
             new_code_set.remove(code)
         else:
             # test code positions (gladiators)
@@ -120,7 +120,7 @@ def remove_codes(code_set, guess, response):
             for pos in range(0, len(code)):
                 if guess[pos] == code[pos]:
                     count += 1
-            if correct_gladiators > count:
+            if correct_gladiators != count:
                 new_code_set.remove(code)
     return new_code_set
 
@@ -130,7 +130,7 @@ def fight_gladiators(guess_set, level, lvl_info, headers):
     # defeat the gladiators!!!
     while (True):
         # random guess from the set
-        guess = list(random_guess(guess_set))
+        guess = list(random_guess(guess_set))  # TODO doesn't have to be a list?
         print("Guess set size : {}".format(len(guess_set)))
         print("Guess: {}".format(guess))
 
@@ -153,16 +153,21 @@ def fight_gladiators(guess_set, level, lvl_info, headers):
             return 1
         else:
             print('Judgement was not prepared for.  Code more...')
+            print(judgement)
             sys.exit(0)
 
 """level 4 - determine correct weapons"""
 def determine_weapons(weapon_set, level, headers):
+    count = 0
+    print('Determining correct weapon set.')
     while (True):
+        count += 1
         guess_weapons = list(random_guess(weapon_set))
         judgement = post_guess(level, guess_weapons, headers)
         if 'response' in judgement:
             num_correct_weapons = judgement['response'][0]
             if num_correct_weapons == 6:
+                print('Required {} weapons.'.format(count))
                 return guess_weapons
             else:
                 # remove guesses from guess set that wouldn't give the same judgement
@@ -173,16 +178,17 @@ def determine_weapons(weapon_set, level, headers):
             return ()
         else:
             print('Judgement was not prepared for.  Code more...')
+            print(judgement)
             sys.exit(0)
 
 """level 4 - remove codes"""
 def remove_codes_4(code_set, guess, response):
     correct_weapons = response[0]
     new_code_set = set(code_set)
-    new_code_set.remove(tuple(guess))
+    #new_code_set.remove(tuple(guess))
     for code in code_set:
         # test code weapons
-        if correct_weapons > len(set(code) & set(guess)):
+        if correct_weapons != len(set(code) & set(guess)):
             new_code_set.remove(code)
     return new_code_set
 
@@ -193,13 +199,16 @@ def minimax(guess_set, num_gladiators):
     ret_score = 0
     for code in guess_set:
         score = 1000000
-        for second in range(num_gladiators + 1):
+        print('code: {}'.format(code)) # DEBUG
+        for second in range(num_gladiators):
             for first in range(num_gladiators + 1):
                 if second <= first:
                     # calc score
-                    temp = len(guess_set) - len(remove_codes(guess_set, code, [first, second]))
-                    if temp < score:
-                        score = temp
+                    guess_set_temp = remove_codes(guess_set, code, [first, second])
+                    score_temp = len(guess_set) - len(guess_set_temp)
+                    print('response: {0}  score: {1}'.format([first, second], score_temp))  # DEBUG
+                    if score_temp < score:
+                        score = score_temp
         if score > ret_score:
             ret_score = score
             ret = code

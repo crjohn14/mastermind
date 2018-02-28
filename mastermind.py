@@ -2,6 +2,7 @@ import requests, json, sys, random, time
 from itertools import permutations, combinations
 from call_api import post_reset, post_guess, get_hash, get_header, get_level
 
+
 def main():
     # check Python version
     if sys.version_info < (3, 0):

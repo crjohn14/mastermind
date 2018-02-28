@@ -1,7 +1,6 @@
-import requests, json, sys, random
+import requests, json, sys, random, time
 from itertools import permutations, combinations
-
-base_url = 'https://mastermind.praetorian.com'
+from call_api import post_reset, post_guess, get_hash, get_header, get_level
 
 def main():
     # check Python version
@@ -18,7 +17,7 @@ def main():
     level = 1
     while(not done):
         # request level info from the mastermind
-        lvl_info = request_level(level, headers)
+        lvl_info = get_level(level, headers)
 
         if 'numWeapons' in lvl_info:
             print_level_info(level, lvl_info)
@@ -43,7 +42,7 @@ def main():
             # determine the correct weapons in level 4
             weapon_set = set(combinations(range(lvl_info['numWeapons']), lvl_info['numGladiators']))
             correct_weapons = determine_weapons(weapon_set, level, headers)
-            print('correct weapons: {}'.format(correct_weapons))
+            print('correct weapons: {}\n'.format(correct_weapons))
             if correct_weapons == ():
                 continue
             # build permutations with only correct weapons
@@ -51,35 +50,6 @@ def main():
             level += fight_gladiators(guess_set, level, lvl_info, headers)
 
     sys.exit(0)
-
-"""Prepare headers for subsequent API calls"""
-def get_header():
-    email = 'cjohnson@cm.utexas.edu'  # my email
-    r = requests.post('https://mastermind.praetorian.com/api-auth-token/', data={'email': email})
-    r.json()
-    headers = r.json()  # > {'Auth-Token': 'AUTH_TOKEN'}
-    headers['Content-Type'] = 'application/json'
-    return headers
-
-"""request level information from mastermind"""
-def request_level(level_number, headers):
-    r = requests.get(base_url + '/level/' + str(level_number) + '/', headers=headers)
-    return r.json()  # > {'numGladiators': 4, 'numGuesses': 8, 'numRounds': 1, 'numWeapons': 6}
-
-"""post guess to mastermind"""
-def post_guess(level_number, guess, headers):
-    r = requests.post(base_url + '/level/' + str(level_number) + '/', data=json.dumps({'guess': guess}), headers=headers)
-    return r.json()  # > {'response': [2, 1]}
-
-"""request hash for completing mastermind"""
-def get_hash(headers):
-    r = requests.post(base_url + '/hash/', headers=headers)
-    return r.json()
-
-"""post reset to start back at level 1"""
-def post_reset(headers):
-    r = requests.post(base_url + '/reset/', headers=headers)
-    return r.json()
 
 """Print level information"""
 def print_level_info(level, lvl_info):
@@ -89,16 +59,6 @@ def print_level_info(level, lvl_info):
     print('guesses: {0[numGuesses]:d}'.format(lvl_info))
     print('weapons: {0[numWeapons]:d}'.format(lvl_info))
     print('gladiators: {0[numGladiators]:d}\n'.format(lvl_info))
-
-"""Generator for unique permutations of an iterable - 
-https://stackoverflow.com/questions/6284396/permutations-with-unique-values"""
-def unique_permutations(iterable, r=None):
-    # TODO not sure i need this
-    previous = tuple()
-    for p in permutations(sorted(iterable), r):
-        if p > previous:
-            previous = p
-            yield p
 
 """Choose a random guess from the guess set"""
 def random_guess(guess_set):
@@ -130,10 +90,9 @@ def fight_gladiators(guess_set, level, lvl_info, headers):
     # defeat the gladiators!!!
     while (True):
         # random guess from the set
-        guess = list(random_guess(guess_set))  # TODO doesn't have to be a list?
-        print("Guess set size : {}".format(len(guess_set)))
+        guess = random_guess(guess_set)
+        print("Guess set size: {}".format(len(guess_set)))
         print("Guess: {}".format(guess))
-
         # accept judgement from the mastermind
         judgement = post_guess(level, guess, headers)
 
@@ -141,16 +100,25 @@ def fight_gladiators(guess_set, level, lvl_info, headers):
             # print judgement
             print('correct weapons: {0} / {1}'.format(judgement['response'][0], lvl_info['numGladiators']))
             print('correct gladiators: {0} / {1}\n'.format(judgement['response'][1], lvl_info['numGladiators']))
-            # remove guesses from guess set that wouldn't give the same judgement
+            # remove guesses from guess_set that wouldn't give the same judgement
+            start = time.process_time() # DEBUG
             guess_set = remove_codes(guess_set, guess, judgement['response'])
+            stop = time.process_time() # DEBUG
+            print('remove_codes duration: {0:.3f} seconds'.format(stop - start)) # DEBUG
         elif 'error' in judgement:
             # error; probably because 10 sec passed or no more guesses
             print(judgement['error'])
             return 0
         elif 'message' in judgement:
+            # level complete
             print('YOU HAVE SLAIN YOUR OPPONENTS!!!')
             print(judgement['message'])
             return 1
+        elif 'roundsLeft' in judgement:
+            # accounts for extra rounds in levels > 4
+            print('YOU HAVE SLAIN YOUR OPPONENTS!!!')
+            print('Rounds left: {}'.format(judgement['roundsLeft']))
+            return 0
         else:
             print('Judgement was not prepared for.  Code more...')
             print(judgement)
@@ -167,7 +135,7 @@ def determine_weapons(weapon_set, level, headers):
         if 'response' in judgement:
             num_correct_weapons = judgement['response'][0]
             if num_correct_weapons == 6:
-                print('Required {} weapons.'.format(count))
+                print('Required {} guesses.'.format(count))
                 return guess_weapons
             else:
                 # remove guesses from guess set that wouldn't give the same judgement
@@ -185,7 +153,6 @@ def determine_weapons(weapon_set, level, headers):
 def remove_codes_4(code_set, guess, response):
     correct_weapons = response[0]
     new_code_set = set(code_set)
-    #new_code_set.remove(tuple(guess))
     for code in code_set:
         # test code weapons
         if correct_weapons != len(set(code) & set(guess)):
@@ -193,6 +160,7 @@ def remove_codes_4(code_set, guess, response):
     return new_code_set
 
 """minimax - calculate how many possibilities in the set would be eliminated for each possible response from mastermind
+    NOT IMPLEMENTED/INCOMPLETE
     :return - code with highest minimum score"""
 def minimax(guess_set, num_gladiators):
     ret = ()
@@ -216,7 +184,3 @@ def minimax(guess_set, num_gladiators):
 
 if __name__ == "__main__":
     main()
-
-# TODO
-# get past lvl 4
-# implement minimax

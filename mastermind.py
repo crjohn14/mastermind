@@ -207,7 +207,9 @@ def remove_codes_4(code_set, guess, response):
 def minimax(guess_set, num_gladiators):
     """minimax - calculate how many possibilities in the set would be eliminated for each possible response
 
-    NOT IMPLEMENTED/INCOMPLETE
+    NOT IMPLEMENTED/INCOMPLETE - while testing it appeared that each response had the same minimum although the other
+    scores were different.  Because minimax chooses the maximum minimum this algorithm would do nothing but waste time.
+    TODO - Maybe choose the code with the highest average score?
 
     Returns:
         tuple: code with highest minimum score

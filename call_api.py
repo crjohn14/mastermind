@@ -12,6 +12,8 @@ import requests, json
 
 BASE_URL = 'https://mastermind.praetorian.com'
 
+file_request_time = open('request_times.txt', 'w') # DEBUG
+
 def get_header():
     """Prepare headers for subsequent API calls"""
     email = 'cjohnson@cm.utexas.edu'  # my email
@@ -23,12 +25,14 @@ def get_header():
 def get_level(level_number, headers):
     """request level information from mastermind"""
     r = requests.get('{0}/level/{1}/'.format(BASE_URL, level_number), headers=headers)
+    file_request_time.write('get_level: ' + str(r.elapsed.total_seconds()) + '\n')
     return r.json()  # > {'numGladiators': 4, 'numGuesses': 8, 'numRounds': 1, 'numWeapons': 6}
 
 def post_guess(level_number, guess, headers):
     """post guess to mastermind"""
     r = requests.post('{0}/level/{1}/'.format(BASE_URL, level_number), data=json.dumps({'guess': guess}), headers=headers)
     print('Request duration: {0:.3f} seconds'.format(r.elapsed.total_seconds())) # DEBUG
+    file_request_time.write('post_guess: ' + str(r.elapsed.total_seconds()) + '\n') # DEBUG
     return r.json()  # > {'response': [2, 1]}
 
 def get_hash(headers):

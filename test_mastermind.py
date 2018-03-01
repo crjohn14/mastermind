@@ -1,6 +1,6 @@
 import unittest
 from itertools import permutations, combinations
-from mastermind import minimax, remove_codes, remove_codes_4, determine_weapons, random_guess
+from mastermind import remove_codes, remove_codes_4
 
 class MyTest(unittest.TestCase):
 
@@ -39,7 +39,6 @@ class MyTest(unittest.TestCase):
         new_set = remove_codes_4(weapon_set, (1, 2, 3), [2, 1])
         answer = set([(2,3,4), (1,2,4), (1,3,4), (1,3,5), (2,3,5), (1,2,5), (2,3,6), (1,3,6), (1,2,6)])
         self.assertEqual(new_set, answer)
-
 
 
 if __name__ == '__main__':

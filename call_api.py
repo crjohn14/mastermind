@@ -12,32 +12,40 @@ import requests, json
 
 BASE_URL = 'https://mastermind.praetorian.com'
 
-file_request_time = open('request_times.txt', 'w') # DEBUG
+s = requests.Session()
+
+#file_request_time = open('request_times.txt', 'w') # DEBUG
 
 def get_header():
     """Prepare headers for subsequent API calls"""
-    email = 'cjohnson@cm.utexas.edu'  # my email
-    r = requests.post('{0}/api-auth-token/'.format(BASE_URL), data={'email': email})
-    headers = r.json()  # > {'Auth-Token': 'AUTH_TOKEN'}
-    headers['Content-Type'] = 'application/json'
-    return headers
+    EMAIL = 'cjohnson@cm.utexas.edu'  # my email
+    r = s.post('{0}/api-auth-token/'.format(BASE_URL), data={'email': EMAIL})
+    #headers = r.json()  # > {'Auth-Token': 'AUTH_TOKEN'}
+    #headers['Content-Type'] = 'application/json'
+
+    print(s.headers)
+    s.headers.update(r.json)
+    s.headers.update({'Content-Type' : 'application/json'})
+    print(s.headers)
+
+    return
 
 def get_level(level_number, headers):
     """request level information from mastermind"""
     r = requests.get('{0}/level/{1}/'.format(BASE_URL, level_number), headers=headers)
-    file_request_time.write('get_level: ' + str(r.elapsed.total_seconds()) + '\n')
+    #file_request_time.write('get_level: ' + str(r.elapsed.total_seconds()) + '\n')
     return r.json()  # > {'numGladiators': 4, 'numGuesses': 8, 'numRounds': 1, 'numWeapons': 6}
 
 def post_guess(level_number, guess, headers):
     """post guess to mastermind"""
     r = requests.post('{0}/level/{1}/'.format(BASE_URL, level_number), data=json.dumps({'guess': guess}), headers=headers)
     print('Request duration: {0:.3f} seconds'.format(r.elapsed.total_seconds())) # DEBUG
-    file_request_time.write('post_guess: ' + str(r.elapsed.total_seconds()) + '\n') # DEBUG
+    #file_request_time.write('post_guess: ' + str(r.elapsed.total_seconds()) + '\n') # DEBUG
     return r.json()  # > {'response': [2, 1]}
 
 def get_hash(headers):
     """request hash for completing mastermind"""
-    r = requests.post('{0}/hash/'.format(BASE_URL), headers=headers)
+    r = requests.get('{0}/hash/'.format(BASE_URL), headers=headers)
     return r.json()
 
 def post_reset(headers):

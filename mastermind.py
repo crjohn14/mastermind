@@ -1,6 +1,6 @@
 """Solution for Praetorians's Mastermind Challenge
 Chris Johnson
-Date: 21 Feb 2018 - current
+Date: 21 Feb 2018
 
 The challenge is a variation of the boardgame Mastermind in which 1 player creates a code and the other player guesses
 until the code is found or they run out of turns.  After each guess they are told how many code elements were correct
@@ -23,17 +23,17 @@ The algorithm:
 
 Minimax was found to not be necessary (may implement later) when selecting guesses.
 
-Level 4 required a different strategy due to the ~128 million permutations.  First the correct set of weapons were
+Level 4 requires a different strategy due to the ~128 million permutations.  First the correct set of weapons is
 determined by guessing from a set of all possible weapon combinations, which is only 177,100.  Once the correct set of
 weapons is determined, further guesses are made from permutations of only those weapons.
 
-I was unable to get past level 5 due to the server occasionally taking as long as 20 seconds to respond to a post
-request.
+I was unable to get past level 5 due to the server occasionally taking as long as 30 seconds to respond to a post
+request.  The delays were always in increments of 5 + a fraction of a second... very suspicious.
 """
 
 import sys, random, time
 from itertools import permutations, combinations
-from call_api import post_reset, post_guess, get_header, get_level
+from call_api import post_reset, post_guess, get_header, get_level, get_hash
 
 def main():
     # check Python version
@@ -52,6 +52,15 @@ def main():
             print_level_info(level, lvl_info)
         elif 'error' in lvl_info:
             print(lvl_info['error'])
+            # check for win
+            if level > 6:
+                hash_json = get_hash(headers)
+                print(hash_json)
+                if 'hash' in hash_json:
+                    file_hash = open('hash.txt', 'w')
+                    file_hash.write(hash_json['hash'])
+                    file_hash.close()
+                    sys.exit(0)
             continue
         elif 'hash' in lvl_info:
             print('Victory is yours!!!')
@@ -149,7 +158,7 @@ def fight_gladiators(guess_set, level, lvl_info, headers):
             start = time.process_time() # DEBUG
             guess_set = remove_codes(guess_set, guess, judgement['response'])
             stop = time.process_time() # DEBUG
-            print('remove_codes duration: {0:.3f} seconds'.format(stop - start)) # DEBUG
+            # print('remove_codes duration: {0:.3f} seconds'.format(stop - start)) # DEBUG
         elif 'error' in judgement:
             # error; probably because 10 sec passed or no more guesses
             print(judgement['error'])
@@ -158,6 +167,14 @@ def fight_gladiators(guess_set, level, lvl_info, headers):
             # level complete
             print('YOU HAVE SLAIN YOUR OPPONENTS!!!')
             print(judgement['message'])
+            # check for win
+            #if judgement['message'] == 'Congratulations!':
+            #    hash = get_hash(headers)
+            #    file_hash = open('hash.txt', 'w')
+            #    file_hash.write(str(hash))
+            #    file_hash.close()
+            #    print(hash)
+            #    sys.exit(0)
             return 1
         elif 'roundsLeft' in judgement:
             # accounts for extra rounds in levels > 4

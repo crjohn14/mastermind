@@ -2,7 +2,7 @@
 Chris Johnson
 Date: 21 Feb 2018
 
-The challenge is a variation of the boardgame Mastermind in which 1 player creates a code and the other player guesses
+The challenge is a variation of the board game Mastermind in which 1 player creates a code and the other player guesses
 until the code is found or they run out of turns.  After each guess they are told how many code elements were correct
 and how many code positions were correct.  This version simulates fighting a number of gladiators, each of which are
 weak to a specific weapon.  The player is given the number of gladiators and the number of possible weapons at the start
@@ -21,32 +21,34 @@ The algorithm:
 5. Else, Remove all codes from S that would not give the same response
 6. Repeat from step 2
 
-Minimax was found to not be necessary (may implement later) when selecting guesses.
+Minimax was found to not be necessary when selecting guesses.  Initial testing showed that my implementation of minimax
+gave a similar minimum for each guess which made it just waste time.
 
-Level 4 requires a different strategy due to the ~128 million permutations.  First the correct set of weapons is
-determined by guessing from a set of all possible weapon combinations, which is only 177,100.  Once the correct set of
-weapons is determined, further guesses are made from permutations of only those weapons.
+Level 4 requires a different strategy due to the ~128 million permutations (although it was fun to watch my RAM fill up
+before the program crashed).  First the correct set of weapons is determined by guessing from a set of all possible
+weapon combinations, which is only 177,100.  Once the correct set of weapons is determined, further guesses are made
+from permutations of only those weapons.
 
-I was unable to get past level 5 due to the server occasionally taking as long as 30 seconds to respond to a post
-request.  The delays were always in increments of 5 + a fraction of a second... very suspicious.
+Maintaining an open TCP connection was key to completing levels 5 and 6.  Requests would occasionally take longer than
+the 10 second timeout period without using a requests session object.
 """
 
 import sys, random, time
 from itertools import permutations, combinations
-from call_api import post_reset, post_guess, get_header, get_level, get_hash
+from call_api import post_reset, post_guess, init_header, get_level, get_hash
 
 def main():
     # check Python version
     if sys.version_info < (3, 0):
         sys.exit('Python version < 3.0 does not support modern TLS versions. You will have trouble connecting to our API using Python 2.X.')
 
-    headers = get_header()
-    post_reset(headers)
+    init_header()
+    post_reset()
 
     done = False
     level = 1
     while(not done):
-        lvl_info = get_level(level, headers)
+        lvl_info = get_level(level)
 
         if 'numWeapons' in lvl_info:
             print_level_info(level, lvl_info)
@@ -54,7 +56,7 @@ def main():
             print(lvl_info['error'])
             # check for win
             if level > 6:
-                hash_json = get_hash(headers)
+                hash_json = get_hash()
                 print(hash_json)
                 if 'hash' in hash_json:
                     file_hash = open('hash.txt', 'w')
@@ -75,17 +77,17 @@ def main():
         if level != 4:
             # build set of possible permutations, guess, check, remove from set and repeat if necessary
             guess_set = set(permutations(range(lvl_info['numWeapons']), lvl_info['numGladiators']))
-            level += fight_gladiators(guess_set, level, lvl_info, headers)
+            level += fight_gladiators(guess_set, level, lvl_info)
         else:
             # determine the correct weapons in level 4 from weapon combinations
             weapon_set = set(combinations(range(lvl_info['numWeapons']), lvl_info['numGladiators']))
-            correct_weapons = determine_weapons(weapon_set, level, headers)
+            correct_weapons = determine_weapons(weapon_set, level)
             print('correct weapons: {}\n'.format(correct_weapons))
             if correct_weapons == ():
                 continue
             # build permutations with only correct weapons
             guess_set = set(permutations(correct_weapons, lvl_info['numGladiators']))
-            level += fight_gladiators(guess_set, level, lvl_info, headers)
+            level += fight_gladiators(guess_set, level, lvl_info)
 
     sys.exit(0)
 
@@ -130,7 +132,7 @@ def remove_codes(code_set, guess, response):
                 new_code_set.remove(code)
     return new_code_set
 
-def fight_gladiators(guess_set, level, lvl_info, headers):
+def fight_gladiators(guess_set, level, lvl_info):
     """Choose a random element from the guess set, post guess, receive judgement, then update the set if necessary
 
     Args:
@@ -148,17 +150,14 @@ def fight_gladiators(guess_set, level, lvl_info, headers):
         print("Guess set size: {}".format(len(guess_set)))
         print("Guess: {}".format(guess))
         # accept judgement from the mastermind
-        judgement = post_guess(level, guess, headers)
+        judgement = post_guess(level, guess)
 
         if 'response' in judgement:
             # print judgement
             print('correct weapons: {0} / {1}'.format(judgement['response'][0], lvl_info['numGladiators']))
             print('correct gladiators: {0} / {1}\n'.format(judgement['response'][1], lvl_info['numGladiators']))
             # remove guesses from guess_set that wouldn't give the same judgement
-            start = time.process_time() # DEBUG
             guess_set = remove_codes(guess_set, guess, judgement['response'])
-            stop = time.process_time() # DEBUG
-            # print('remove_codes duration: {0:.3f} seconds'.format(stop - start)) # DEBUG
         elif 'error' in judgement:
             # error; probably because 10 sec passed or no more guesses
             print(judgement['error'])
@@ -167,14 +166,6 @@ def fight_gladiators(guess_set, level, lvl_info, headers):
             # level complete
             print('YOU HAVE SLAIN YOUR OPPONENTS!!!')
             print(judgement['message'])
-            # check for win
-            #if judgement['message'] == 'Congratulations!':
-            #    hash = get_hash(headers)
-            #    file_hash = open('hash.txt', 'w')
-            #    file_hash.write(str(hash))
-            #    file_hash.close()
-            #    print(hash)
-            #    sys.exit(0)
             return 1
         elif 'roundsLeft' in judgement:
             # accounts for extra rounds in levels > 4
@@ -186,14 +177,14 @@ def fight_gladiators(guess_set, level, lvl_info, headers):
             print(judgement)
             sys.exit(0)
 
-def determine_weapons(weapon_set, level, headers):
+def determine_weapons(weapon_set, level):
     """level 4 - determine correct weapons"""
     count = 0
     print('Determining correct weapon set.')
     while (True):
         count += 1
         guess_weapons = list(random_guess(weapon_set))
-        judgement = post_guess(level, guess_weapons, headers)
+        judgement = post_guess(level, guess_weapons)
         if 'response' in judgement:
             num_correct_weapons = judgement['response'][0]
             if num_correct_weapons == 6:
@@ -248,6 +239,7 @@ def minimax(guess_set, num_gladiators):
         if score > ret_score:
             ret_score = score
             ret = code
+    print('ret_score: {}'.format(ret_score))
     return ret
 
 if __name__ == "__main__":

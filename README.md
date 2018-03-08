@@ -1,7 +1,9 @@
 # Mastermind
 
 Solution for Praetorians's Mastermind Challenge
+
 Chris Johnson
+
 Start Date: 21 Feb 2018
 
 The challenge is a variation of the board game Mastermind in which 1 player creates a code and the other player guesses
